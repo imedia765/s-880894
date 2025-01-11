@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const MASTER_REPO = 'https://github.com/imedia765/s-935078.git';
-
 async function getGitHubReference(owner: string, repo: string, ref: string, githubToken: string) {
   console.log(`Getting reference for ${owner}/${repo}#${ref}`);
   
@@ -39,6 +37,36 @@ async function getGitHubReference(owner: string, repo: string, ref: string, gith
     return data;
   } catch (error) {
     console.error('Error getting reference:', error);
+    throw error;
+  }
+}
+
+async function getLatestCommit(owner: string, repo: string, branch: string, githubToken: string) {
+  console.log(`Getting latest commit for ${owner}/${repo}#${branch}`);
+  
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/commits/${branch}`,
+      {
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'Supabase-Edge-Function'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Failed to get latest commit: ${errorText}`);
+      throw new Error(`Failed to get latest commit: ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log(`Successfully got latest commit:`, data);
+    return data.sha;
+  } catch (error) {
+    console.error('Error getting latest commit:', error);
     throw error;
   }
 }
@@ -167,14 +195,16 @@ async function performGitSync(operation: string, customUrl: string, githubToken:
     }
 
     // Check if custom branch exists
-    const customRef = await getGitHubReference(customOwner, customRepo, customDefaultBranch, githubToken);
+    let customRef = await getGitHubReference(customOwner, customRepo, customDefaultBranch, githubToken);
     
     if (customRef) {
       // Update existing reference
       await updateGitHubReference(customOwner, customRepo, customDefaultBranch, masterRef.object.sha, githubToken);
     } else {
+      // Get latest commit SHA from master
+      const latestCommitSha = await getLatestCommit(masterOwner, masterRepo, masterDefaultBranch, githubToken);
       // Create new reference
-      await createGitHubReference(customOwner, customRepo, customDefaultBranch, masterRef.object.sha, githubToken);
+      await createGitHubReference(customOwner, customRepo, customDefaultBranch, latestCommitSha, githubToken);
     }
   } else if (operation === 'push') {
     // Get custom branch reference
@@ -184,17 +214,21 @@ async function performGitSync(operation: string, customUrl: string, githubToken:
     }
 
     // Check if master branch exists
-    const masterRef = await getGitHubReference(masterOwner, masterRepo, masterDefaultBranch, githubToken);
+    let masterRef = await getGitHubReference(masterOwner, masterRepo, masterDefaultBranch, githubToken);
     
     if (masterRef) {
       // Update existing reference
       await updateGitHubReference(masterOwner, masterRepo, masterDefaultBranch, customRef.object.sha, githubToken);
     } else {
+      // Get latest commit SHA from custom repo
+      const latestCommitSha = await getLatestCommit(customOwner, customRepo, customDefaultBranch, githubToken);
       // Create new reference
-      await createGitHubReference(masterOwner, masterRepo, masterDefaultBranch, customRef.object.sha, githubToken);
+      await createGitHubReference(masterOwner, masterRepo, masterDefaultBranch, latestCommitSha, githubToken);
     }
   }
 }
+
+const MASTER_REPO = 'https://github.com/imedia765/s-935078.git';
 
 serve(async (req) => {
   // Handle CORS preflight requests
