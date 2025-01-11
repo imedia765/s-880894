@@ -64,7 +64,28 @@ async function createGitHubReference(owner: string, repo: string, ref: string, s
   console.log(`Creating reference refs/heads/${ref} in ${owner}/${repo} pointing to ${sha}`);
   
   try {
+    // First check if there are any commits in the repository
     const response = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/commits`,
+      {
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': `Bearer ${token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to check commits: ${await response.text()}`);
+    }
+
+    const commits = await response.json();
+    if (!commits || commits.length === 0) {
+      throw new Error('Cannot create reference in empty repository');
+    }
+
+    const createResponse = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/git/refs`,
       {
         method: 'POST',
@@ -81,11 +102,11 @@ async function createGitHubReference(owner: string, repo: string, ref: string, s
       }
     );
 
-    if (!response.ok) {
-      throw new Error(`Failed to create reference: ${await response.text()}`);
+    if (!createResponse.ok) {
+      throw new Error(`Failed to create reference: ${await createResponse.text()}`);
     }
 
-    const data = await response.json();
+    const data = await createResponse.json();
     console.log('Successfully created reference:', JSON.stringify(data, null, 2));
     return data;
   } catch (error) {
@@ -123,7 +144,9 @@ async function updateGitHubReference(owner: string, repo: string, ref: string, s
     );
 
     if (!response.ok) {
-      throw new Error(`Failed to update reference: ${await response.text()}`);
+      const errorText = await response.text();
+      console.error('Error updating reference:', errorText);
+      throw new Error(`Failed to update reference: ${errorText}`);
     }
 
     const data = await response.json();
@@ -131,34 +154,6 @@ async function updateGitHubReference(owner: string, repo: string, ref: string, s
     return data;
   } catch (error) {
     console.error('Error updating reference:', error);
-    throw error;
-  }
-}
-
-async function getDefaultBranch(owner: string, repo: string, token: string) {
-  console.log(`Getting default branch for ${owner}/${repo}`);
-  
-  try {
-    const response = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}`,
-      {
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'Authorization': `Bearer ${token}`,
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to get repository info: ${await response.text()}`);
-    }
-
-    const data = await response.json();
-    console.log(`Default branch is: ${data.default_branch}`);
-    return data.default_branch;
-  } catch (error) {
-    console.error('Error getting default branch:', error);
     throw error;
   }
 }
@@ -172,29 +167,14 @@ async function performGitSync(operation: string, customUrl: string, masterUrl: s
     throw new Error('Invalid repository URLs provided');
   }
 
-  // Get default branches
-  const masterDefaultBranch = await getDefaultBranch(masterRepo.owner, masterRepo.repo, githubToken);
-  const customDefaultBranch = await getDefaultBranch(customRepo.owner, customRepo.repo, githubToken);
-
-  if (operation === 'pull') {
-    // Get master branch reference
-    const masterRef = await getGitHubReference(masterRepo.owner, masterRepo.repo, masterDefaultBranch, githubToken);
-    if (!masterRef) {
-      throw new Error('Master branch reference not found');
-    }
-
-    // Update or create custom branch reference
-    await updateGitHubReference(customRepo.owner, customRepo.repo, customDefaultBranch, masterRef.object.sha, githubToken);
-  } else if (operation === 'push') {
-    // Get custom branch reference
-    const customRef = await getGitHubReference(customRepo.owner, customRepo.repo, customDefaultBranch, githubToken);
-    if (!customRef) {
-      throw new Error('Custom branch reference not found');
-    }
-
-    // Update or create master branch reference
-    await updateGitHubReference(masterRepo.owner, masterRepo.repo, masterDefaultBranch, customRef.object.sha, githubToken);
+  // Get master branch reference
+  const masterRef = await getGitHubReference(masterRepo.owner, masterRepo.repo, 'main', githubToken);
+  if (!masterRef) {
+    throw new Error('Master branch reference not found');
   }
+
+  // Update or create custom branch reference
+  await updateGitHubReference(customRepo.owner, customRepo.repo, 'main', masterRef.object.sha, githubToken);
 }
 
 serve(async (req) => {
@@ -214,8 +194,7 @@ serve(async (req) => {
     }
 
     const { operation, customUrl, masterUrl } = await req.json();
-
-    console.log('Starting git sync operation...');
+    console.log('Processing git sync operation:', { operation, customUrl, masterUrl });
 
     // Initialize Supabase client
     const supabase = createClient(
