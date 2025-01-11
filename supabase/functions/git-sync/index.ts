@@ -111,6 +111,14 @@ async function updateGitHubReference(owner: string, repo: string, ref: string, s
   console.log(`Updating reference for ${owner}/${repo}#${ref} with SHA ${sha}`);
   
   try {
+    // First check if the reference exists
+    const existingRef = await getGitHubReference(owner, repo, ref, githubToken);
+    
+    if (!existingRef) {
+      console.log(`Reference doesn't exist, creating new one`);
+      return await createGitHubReference(owner, repo, ref, sha, githubToken);
+    }
+
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${ref}`,
       {
@@ -194,18 +202,8 @@ async function performGitSync(operation: string, customUrl: string, githubToken:
       throw new Error('Master branch reference not found');
     }
 
-    // Check if custom branch exists
-    let customRef = await getGitHubReference(customOwner, customRepo, customDefaultBranch, githubToken);
-    
-    if (customRef) {
-      // Update existing reference
-      await updateGitHubReference(customOwner, customRepo, customDefaultBranch, masterRef.object.sha, githubToken);
-    } else {
-      // Get latest commit SHA from master
-      const latestCommitSha = await getLatestCommit(masterOwner, masterRepo, masterDefaultBranch, githubToken);
-      // Create new reference
-      await createGitHubReference(customOwner, customRepo, customDefaultBranch, latestCommitSha, githubToken);
-    }
+    // Update or create custom branch reference
+    await updateGitHubReference(customOwner, customRepo, customDefaultBranch, masterRef.object.sha, githubToken);
   } else if (operation === 'push') {
     // Get custom branch reference
     const customRef = await getGitHubReference(customOwner, customRepo, customDefaultBranch, githubToken);
@@ -213,18 +211,8 @@ async function performGitSync(operation: string, customUrl: string, githubToken:
       throw new Error('Custom branch reference not found');
     }
 
-    // Check if master branch exists
-    let masterRef = await getGitHubReference(masterOwner, masterRepo, masterDefaultBranch, githubToken);
-    
-    if (masterRef) {
-      // Update existing reference
-      await updateGitHubReference(masterOwner, masterRepo, masterDefaultBranch, customRef.object.sha, githubToken);
-    } else {
-      // Get latest commit SHA from custom repo
-      const latestCommitSha = await getLatestCommit(customOwner, customRepo, customDefaultBranch, githubToken);
-      // Create new reference
-      await createGitHubReference(masterOwner, masterRepo, masterDefaultBranch, latestCommitSha, githubToken);
-    }
+    // Update or create master branch reference
+    await updateGitHubReference(masterOwner, masterRepo, masterDefaultBranch, customRef.object.sha, githubToken);
   }
 }
 
