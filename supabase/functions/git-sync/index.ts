@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -216,37 +217,38 @@ serve(async (req) => {
 
     console.log('Starting git sync operation...');
 
-    // Create operation log
-    const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { 
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+          detectSessionInUrl: false
+        }
+      }
+    );
+
+    // Get user from auth header
+    const { data: { user }, error: userError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (userError) throw userError;
     console.log('User authenticated:', user.id);
 
-    // Validate URLs before proceeding
-    if (!customUrl || (operation === 'push' && !masterUrl)) {
-      throw new Error('Missing required URLs');
-    }
-
-    const customUrlValidation = validateGitHubUrl(customUrl);
-    if (!customUrlValidation) {
-      throw new Error('Invalid custom repository URL');
-    }
-
-    // Create log entry
-    const { data: logEntry, error: logError } = await supabaseClient
+    // Create operation log
+    const { error: logError } = await supabase
       .from('git_sync_logs')
       .insert({
         operation_type: operation,
         status: 'completed',
         message: `Successfully verified access to ${customUrl}`,
         created_by: user.id,
-      })
-      .select()
-      .single();
+      });
 
-    if (logError) {
-      throw logError;
-    }
-
-    console.log('Operation log created:', logEntry);
+    if (logError) throw logError;
 
     if (masterUrl) {
       console.log(`Performing ${operation} between ${customUrl} and ${masterUrl}`);
