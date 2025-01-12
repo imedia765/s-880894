@@ -13,9 +13,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Database } from "@/integrations/supabase/types";
+import { DatabaseEnums } from "@/integrations/supabase/types/enums";
 
-type UserRole = Database['public']['Enums']['app_role'];
+type UserRole = DatabaseEnums['app_role'];
 
 interface UserRoleData {
   role: UserRole;
@@ -70,7 +70,7 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
           .from('members')
           .select('*')
           .eq('auth_user_id', user.auth_user_id)
-          .single();
+          .maybeSingle();
 
         if (memberError && memberError.code !== 'PGRST116') {
           addLog(`Error fetching member: ${memberError.message}`);
