@@ -1,19 +1,17 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
-import { Settings, User, Shield, Database, Route, Key, AlertCircle } from 'lucide-react';
+import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { DatabaseEnums } from "@/integrations/supabase/types/enums";
+import DiagnosticsPanel from './diagnostics/DiagnosticsPanel';
 
 type UserRole = DatabaseEnums['app_role'];
 
@@ -118,7 +116,7 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
         }
         addLog(`Found ${payments?.length || 0} payment records`);
 
-        const diagnosticResult = {
+        return {
           roles: roles || [],
           member: member || null,
           collector: collector || [],
@@ -147,8 +145,6 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
           },
           timestamp: new Date().toISOString()
         };
-
-        return diagnosticResult;
       } catch (error: any) {
         console.error('Error in diagnostics:', error);
         toast({
@@ -166,7 +162,6 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
     <Card className="p-4 bg-dashboard-card border-dashboard-cardBorder">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
-          <User className="w-5 h-5 text-dashboard-accent1" />
           <h3 className="text-lg font-medium text-white">{user.full_name}</h3>
         </div>
         <DropdownMenu>
@@ -176,120 +171,15 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[600px] bg-dashboard-card border-dashboard-cardBorder">
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-medium text-white">User Diagnostics</h4>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setShowDiagnosis(true);
-                    setLogs([]);
-                  }}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Running...' : 'Run Diagnostics'}
-                </Button>
-              </div>
-
-              {userDiagnostics && (
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-4">
-                    {/* Roles Section */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Shield className="w-4 h-4 text-dashboard-accent1" />
-                        <h5 className="font-medium text-white">Assigned Roles</h5>
-                      </div>
-                      <div className="bg-dashboard-cardHover rounded-lg p-3">
-                        <div className="flex gap-2 flex-wrap">
-                          {userDiagnostics.roles.map((role, idx) => (
-                            <Badge key={idx} variant="default">
-                              {role.role}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Routes Section */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Route className="w-4 h-4 text-dashboard-accent1" />
-                        <h5 className="font-medium text-white">Accessible Routes</h5>
-                      </div>
-                      <div className="bg-dashboard-cardHover rounded-lg p-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          {Object.entries(userDiagnostics.routes || {}).map(([route, hasAccess]) => (
-                            <div key={route} className="flex items-center gap-2">
-                              <Badge variant={hasAccess ? "default" : "secondary"}>
-                                {route}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Database Access Section */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Database className="w-4 h-4 text-dashboard-accent1" />
-                        <h5 className="font-medium text-white">Database Access</h5>
-                      </div>
-                      <div className="bg-dashboard-cardHover rounded-lg p-3">
-                        <div className="grid grid-cols-2 gap-2">
-                          {userDiagnostics.accessibleTables.map((table) => (
-                            <Badge key={table} variant="outline">
-                              {table}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Permissions Section */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Key className="w-4 h-4 text-dashboard-accent1" />
-                        <h5 className="font-medium text-white">Permissions</h5>
-                      </div>
-                      <div className="bg-dashboard-cardHover rounded-lg p-3">
-                        <div className="space-y-2">
-                          {Object.entries(userDiagnostics.permissions || {}).map(([perm, granted]) => (
-                            <div key={perm} className="flex items-center justify-between">
-                              <span className="text-sm text-dashboard-text">
-                                {perm.replace(/([A-Z])/g, ' $1').trim()}
-                              </span>
-                              <Badge variant={granted ? "default" : "secondary"}>
-                                {granted ? 'Granted' : 'Denied'}
-                              </Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Debug Console */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <AlertCircle className="w-4 h-4 text-dashboard-accent1" />
-                        <h5 className="font-medium text-white">Debug Console</h5>
-                      </div>
-                      <div className="bg-black/50 rounded-lg p-3 font-mono text-xs">
-                        <ScrollArea className="h-[200px]">
-                          {logs.map((log, index) => (
-                            <div key={index} className="text-dashboard-text">
-                              {log}
-                            </div>
-                          ))}
-                        </ScrollArea>
-                      </div>
-                    </div>
-                  </div>
-                </ScrollArea>
-              )}
-            </div>
+            <DiagnosticsPanel
+              isLoading={isLoading}
+              userDiagnostics={userDiagnostics}
+              logs={logs}
+              onRunDiagnostics={() => {
+                setShowDiagnosis(true);
+                setLogs([]);
+              }}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
