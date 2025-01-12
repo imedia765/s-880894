@@ -109,12 +109,12 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
         addLog(`Found ${payments?.length || 0} payment records`);
       }
 
-      return {
-        roles,
-        member,
-        collector,
-        auditLogs,
-        payments,
+      const diagnosticResult = {
+        roles: roles || [],
+        member: member || null,
+        collector: collector || [],
+        auditLogs: auditLogs || [],
+        payments: payments || [],
         accessibleTables: [
           'members',
           'user_roles',
@@ -123,21 +123,23 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
           'audit_logs'
         ],
         permissions: {
-          canManageRoles: roles?.some(r => r.role === 'admin'),
-          canCollectPayments: collector?.length > 0,
-          canAccessAuditLogs: roles?.some(r => r.role === 'admin'),
-          canManageMembers: roles?.some(r => ['admin', 'collector'].includes(r.role))
+          canManageRoles: roles?.some(r => r.role === 'admin') || false,
+          canCollectPayments: (collector?.length || 0) > 0,
+          canAccessAuditLogs: roles?.some(r => r.role === 'admin') || false,
+          canManageMembers: roles?.some(r => ['admin', 'collector'].includes(r.role)) || false
         },
         routes: {
           dashboard: true,
           profile: true,
           payments: true,
-          settings: roles?.some(r => r.role === 'admin'),
-          system: roles?.some(r => r.role === 'admin'),
-          audit: roles?.some(r => r.role === 'admin')
+          settings: roles?.some(r => r.role === 'admin') || false,
+          system: roles?.some(r => r.role === 'admin') || false,
+          audit: roles?.some(r => r.role === 'admin') || false
         },
         timestamp: new Date().toISOString()
       };
+
+      return diagnosticResult;
     },
     enabled: showDiagnosis
   });
@@ -219,7 +221,7 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
                         </div>
                         <div className="bg-dashboard-cardHover rounded-lg p-3">
                           <div className="grid grid-cols-2 gap-2">
-                            {Object.entries(userDiagnostics.routes).map(([route, hasAccess]) => (
+                            {Object.entries(userDiagnostics.routes || {}).map(([route, hasAccess]) => (
                               <div key={route} className="flex items-center gap-2">
                                 <Badge variant={hasAccess ? "default" : "secondary"}>
                                   {route}
@@ -255,7 +257,7 @@ const UserRoleCard = ({ user, onRoleChange }: UserRoleCardProps) => {
                         </div>
                         <div className="bg-dashboard-cardHover rounded-lg p-3">
                           <div className="space-y-2">
-                            {Object.entries(userDiagnostics.permissions).map(([perm, granted]) => (
+                            {Object.entries(userDiagnostics.permissions || {}).map(([perm, granted]) => (
                               <div key={perm} className="flex items-center justify-between">
                                 <span className="text-sm text-dashboard-text">
                                   {perm.replace(/([A-Z])/g, ' $1').trim()}
