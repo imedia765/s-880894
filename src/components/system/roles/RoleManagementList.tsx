@@ -25,8 +25,7 @@ interface UserData {
 
 const ITEMS_PER_PAGE = 10;
 
-const RoleManagementList = () => {
-  const [searchTerm, setSearchTerm] = useState('');
+const RoleManagementList = ({ searchTerm }: { searchTerm: string }) => {
   const [selectedRole, setSelectedRole] = useState<UserRole | 'all'>('all');
   const [page, setPage] = useState(0);
   const queryClient = useQueryClient();
@@ -136,7 +135,6 @@ const RoleManagementList = () => {
 
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
     try {
-      // Update will be handled by RoleSelect component
       await queryClient.invalidateQueries({ queryKey: ['users'] });
     } catch (error) {
       console.error('Error in role change:', error);
@@ -159,7 +157,7 @@ const RoleManagementList = () => {
     <div className="space-y-6">
       <RoleManagementHeader
         searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
+        onSearchChange={() => {}}
         selectedRole={selectedRole}
         onRoleChange={setSelectedRole}
         totalCount={users?.length || 0}

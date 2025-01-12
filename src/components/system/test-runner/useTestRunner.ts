@@ -30,7 +30,8 @@ export const useTestRunner = () => {
       console.log('Initiating system checks...');
       
       const { data, error } = await supabase
-        .rpc('run_combined_system_checks');
+        .rpc('run_combined_system_checks')
+        .single();
 
       if (error) {
         console.error('Test run error:', {
@@ -50,7 +51,7 @@ export const useTestRunner = () => {
         throw new Error(`${errorMessage}\n${errorDetails}`);
       }
 
-      if (!data || !Array.isArray(data)) {
+      if (!data) {
         const message = 'Invalid response format from system checks';
         setTestLogs(prev => [...prev, `❌ ${message}`]);
         throw new Error(message);
@@ -59,7 +60,8 @@ export const useTestRunner = () => {
       console.log('System checks results:', data);
 
       // Process and validate each result
-      const processedResults = data.map((result: any) => ({
+      const processedResults = Array.isArray(data) ? data : [data];
+      const validatedResults = processedResults.map((result: any) => ({
         check_type: result.check_type || 'Unknown Check',
         metric_name: result.metric_name,
         current_value: typeof result.current_value === 'number' ? result.current_value : null,
@@ -70,7 +72,7 @@ export const useTestRunner = () => {
       }));
 
       // Group results by category for progress tracking
-      const categories = [...new Set(processedResults.map(r => r.test_category))];
+      const categories = [...new Set(validatedResults.map(r => r.test_category))];
       const totalSteps = categories.length;
       
       // Update progress as we process each category
@@ -80,12 +82,12 @@ export const useTestRunner = () => {
         setCurrentTest(`Processing ${category} tests...`);
       });
 
-      setTestResults(processedResults);
+      setTestResults(validatedResults);
       setProgress(100);
       setCurrentTest('All checks complete');
       
       const resultSummary = categories.map(category => {
-        const categoryResults = processedResults.filter(r => r.test_category === category);
+        const categoryResults = validatedResults.filter(r => r.test_category === category);
         const warnings = categoryResults.filter(r => r.status.toLowerCase() === 'warning').length;
         const critical = categoryResults.filter(r => r.status.toLowerCase() === 'critical').length;
         return `${category}: ${categoryResults.length} tests (${warnings} warnings, ${critical} critical)`;
@@ -99,7 +101,7 @@ export const useTestRunner = () => {
 
       toast.success('System checks completed successfully');
       
-      return processedResults;
+      return validatedResults;
     } catch (error: any) {
       console.error('System checks error:', error);
       const errorMessage = error.message || 'Unknown error occurred';
