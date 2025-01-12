@@ -2,6 +2,11 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DatabaseEnums } from "@/integrations/supabase/types/enums";
 import { Settings } from "lucide-react";
+import RolesSection from "./RolesSection";
+import RoutesSection from "./RoutesSection";
+import DatabaseAccessSection from "./DatabaseAccessSection";
+import PermissionsSection from "./PermissionsSection";
+import DebugConsole from "./DebugConsole";
 
 type UserRole = DatabaseEnums['app_role'];
 
